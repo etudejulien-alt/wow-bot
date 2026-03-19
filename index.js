@@ -8,6 +8,9 @@ const client = new Client({
 
 const TOKEN = process.env.TOKEN;
 const CHANNEL_ID = process.env.CHANNEL_ID;
+console.log("TOKEN:", process.env.TOKEN);
+console.log("CHANNEL_ID:", process.env.CHANNEL_ID);
+
 
 const BASE_URL = "https://www.wowhead.com";
 const FORUM_URL = "https://www.wowhead.com/blue-tracker/forums/eu/classes-30";

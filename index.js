@@ -12,48 +12,25 @@ const CHANNEL_ID = process.env.CHANNEL_ID;
 const BASE_URL = "https://www.wowhead.com";
 const FORUM_URL = "https://www.wowhead.com/blue-tracker/forums/eu/classes-30";
 
-let lastPostLink = "";
-
 async function checkBlueTracker() {
   try {
     const { data } = await axios.get(FORUM_URL, {
       headers: { 'User-Agent': 'Mozilla/5.0' }
     });
 
-    console.log("Page récupérée");
-
     const $ = cheerio.load(data);
 
-    // 🔥 sélection fiable
     const first = $('a[href*="/blue-tracker/topic/"]').first();
 
     const title = first.attr('title') || first.text().trim();
-    const fullLink = BASE_URL + first.attr('href');
+    const link = BASE_URL + first.attr('href');
 
-    console.log("Titre trouvé :", title);
-
-    if (!title || !fullLink) {
-      console.log("Titre ou lien invalide");
+    if (!title || !link) {
+      console.log("Aucun post valide");
       return;
     }
 
-    // 🔁 éviter doublons
-    if (fullLink === lastPostLink) {
-      console.log("Déjà envoyé");
-      return;
-    }
-
-    lastPostLink = fullLink;
-
-    const channel = await client.channels.fetch(CHANNEL_ID);
-
-    await channel.send(
-      `📢 **Blue Post Blizzard (Classes)**\n\n` +
-      `**${title}**\n\n` +
-      `🔗 ${fullLink}`
-    );
-
-    console.log("Message envoyé !");
+    console.log("Post trouvé :", title);
 
   } catch (error) {
     console.error("Erreur :", error.message);
@@ -63,8 +40,12 @@ async function checkBlueTracker() {
 client.once('clientReady', async () => {
   console.log(`Connecté en tant que ${client.user.tag}`);
 
-  await checkBlueTracker();
+  const channel = await client.channels.fetch(CHANNEL_ID);
 
+  // 🔥 message de test obligatoire
+  await channel.send("✅ Bot bien lancé sur Railway !");
+
+  // 🔁 boucle continue (empêche arrêt)
   setInterval(checkBlueTracker, 300000);
 });
 

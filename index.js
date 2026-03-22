@@ -1,36 +1,48 @@
 const { Client, GatewayIntentBits } = require('discord.js');
-const axios = require('axios');
-const cheerio = require('cheerio');
+const Parser = require('rss-parser');
 
 const client = new Client({
   intents: [GatewayIntentBits.Guilds]
 });
 
+const parser = new Parser();
+
 const TOKEN = process.env.TOKEN;
 const CHANNEL_ID = process.env.CHANNEL_ID;
 
-const BASE_URL = "https://www.wowhead.com";
-const FORUM_URL = "https://www.wowhead.com/blue-tracker/forums/eu/classes-30";
+// 🔥 RSS officiel Blue Tracker
+const RSS_URL = "https://eu.forums.blizzard.com/en/wow/c/development/blue-tracker.rss";
 
-async function checkBlueTracker() {
+let lastLink = "";
+
+async function checkBluePosts() {
   try {
-    const { data } = await axios.get(FORUM_URL, {
-      headers: { 'User-Agent': 'Mozilla/5.0' }
-    });
+    const feed = await parser.parseURL(RSS_URL);
 
-    const $ = cheerio.load(data);
+    for (const post of feed.items.slice(0, 5)) {
+      const title = post.title.toLowerCase();
+      const content = (post.contentSnippet || "").toLowerCase();
 
-    const first = $('a[href*="/blue-tracker/topic/"]').first();
+      // 🎯 filtre Midnight
+      if (!title.includes("midnight") && !content.includes("midnight")) {
+        continue;
+      }
 
-    const title = first.attr('title') || first.text().trim();
-    const link = BASE_URL + first.attr('href');
+      if (post.link === lastLink) continue;
 
-    if (!title || !link) {
-      console.log("Aucun post valide");
-      return;
+      lastLink = post.link;
+
+      const channel = await client.channels.fetch(CHANNEL_ID);
+
+      await channel.send(
+        `🌙 **Blue Post - Midnight**\n\n` +
+        `**${post.title}**\n\n` +
+        `🔗 ${post.link}`
+      );
+
+      console.log("Posté :", post.title);
+      break;
     }
-
-    console.log("Post trouvé :", title);
 
   } catch (error) {
     console.error("Erreur :", error.message);
@@ -40,17 +52,9 @@ async function checkBlueTracker() {
 client.once('clientReady', async () => {
   console.log(`Connecté en tant que ${client.user.tag}`);
 
-  const channel = await client.channels.fetch(CHANNEL_ID);
+  await checkBluePosts();
 
-  // 🔥 message de test obligatoire
-  await channel.send("✅ Bot bien lancé sur Railway !");
-
-  // 🔁 boucle continue (empêche arrêt)
-  setInterval(checkBlueTracker, 300000);
-});
-
-process.on('unhandledRejection', error => {
-  console.error('Erreur non gérée:', error);
+  setInterval(checkBluePosts, 300000); // toutes les 5 min
 });
 
 client.login(TOKEN);

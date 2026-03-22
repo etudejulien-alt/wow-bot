@@ -8,9 +8,6 @@ const client = new Client({
 
 const TOKEN = process.env.TOKEN;
 const CHANNEL_ID = process.env.CHANNEL_ID;
-console.log("TOKEN:", process.env.TOKEN);
-console.log("CHANNEL_ID:", process.env.CHANNEL_ID);
-
 
 const BASE_URL = "https://www.wowhead.com";
 const FORUM_URL = "https://www.wowhead.com/blue-tracker/forums/eu/classes-30";
@@ -23,43 +20,53 @@ async function checkBlueTracker() {
       headers: { 'User-Agent': 'Mozilla/5.0' }
     });
 
+    console.log("Page récupérée");
+
     const $ = cheerio.load(data);
 
-    const firstPost = $('.listview-row').first();
-    const linkElement = firstPost.find('a').first();
+    const posts = $('a[href*="/blue-tracker/topic/"]');
 
-    const title = linkElement.text().trim();
-    const relativeLink = linkElement.attr('href');
-    const fullLink = BASE_URL + relativeLink;
+    console.log("Nombre de posts :", posts.length);
 
-    if (!title.toLowerCase().includes("midnight")) {
-      console.log("Post ignoré :", title);
+    if (posts.length === 0) {
+      console.log("Aucun post trouvé !");
       return;
     }
 
-    if (fullLink !== lastPostLink) {
-      lastPostLink = fullLink;
+    const first = posts.first();
 
-      console.log("Nouveau post :", title);
+    const title = first.text().trim();
+    const fullLink = BASE_URL + first.attr('href');
 
-      const { data: postData } = await axios.get(fullLink, {
-        headers: { 'User-Agent': 'Mozilla/5.0' }
-      });
+    console.log("Titre trouvé :", title);
 
-      const $$ = cheerio.load(postData);
-      const content = $$('.forum-post-body').first().text().trim();
-
-      const channel = await client.channels.fetch(CHANNEL_ID);
-
-      const message = content.substring(0, 1800);
-
-      await channel.send(
-        `🌙 **Blue Post Blizzard - Midnight (Classes)**\n\n` +
-        `**${title}**\n\n` +
-        `${message}...\n\n` +
-        `🔗 ${fullLink}`
-      );
+    // 🔁 éviter doublons
+    if (fullLink === lastPostLink) {
+      console.log("Déjà envoyé");
+      return;
     }
+
+    lastPostLink = fullLink;
+
+    const { data: postData } = await axios.get(fullLink, {
+      headers: { 'User-Agent': 'Mozilla/5.0' }
+    });
+
+    const $$ = cheerio.load(postData);
+    const content = $$('.forum-post-body').first().text().trim();
+
+    const channel = await client.channels.fetch(CHANNEL_ID);
+
+    const message = content.substring(0, 1800);
+
+    await channel.send(
+      `📢 **Blue Post Blizzard (Classes)**\n\n` +
+      `**${title}**\n\n` +
+      `${message}...\n\n` +
+      `🔗 ${fullLink}`
+    );
+
+    console.log("Message envoyé !");
 
   } catch (error) {
     console.error("Erreur :", error.message);
@@ -70,7 +77,8 @@ client.once('clientReady', async () => {
   console.log(`Connecté en tant que ${client.user.tag}`);
 
   await checkBlueTracker();
-  setInterval(checkBlueTracker, 300000);
+
+  setInterval(checkBlueTracker, 300000); // 5 minutes
 });
 
 process.on('unhandledRejection', error => {
